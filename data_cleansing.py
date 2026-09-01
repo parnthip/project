@@ -15,7 +15,7 @@ else:  # Linux / Ubuntu
 plt.rcParams['axes.unicode_minus'] = False
 
 # 0. โหลดข้อมูลตั้งต้น
-df = pd.read_csv('Dataset/data_2026.csv')
+df = pd.read_csv('dataset/data_2026.csv')
 
 # ==========================================
 # 1.1 เทคนิคที่ 1: การจัดการ Missing Values และ Drop คอลัมน์ซ้ำซ้อน/ว่างเปล่า (3 คะแนน)

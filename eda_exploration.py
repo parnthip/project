@@ -1,7 +1,7 @@
 import pandas as pd
 
 # 1. โหลดข้อมูล
-df = pd.read_csv('Dataset/data_2026.csv')
+df = pd.read_csv('dataset/data_2026.csv')
 
 # 2. ดูภาพรวมโครงสร้าง จำนวนแถว/คอลัมน์ และ Data Types
 print("=== Overview & Data Types ===")

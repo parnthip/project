@@ -24,11 +24,11 @@ default_args = {
 }
 
 # -------------------------------------------------------------
-# Task 1: Extract & Transform (Cleansing & Feature Engineering)
+# Task 1: Extract & Transform
 # -------------------------------------------------------------
 def extract_and_transform():
     if not os.path.exists(RAW_DATA_PATH):
-        raise FileNotFoundError(f"❌ ไม่พบไฟล์ข้อมูลที่: {RAW_DATA_PATH}")
+        raise FileNotFoundError(f" ไม่พบไฟล์ข้อมูลที่: {RAW_DATA_PATH}")
 
     df = pd.read_csv(RAW_DATA_PATH)
 
@@ -41,12 +41,12 @@ def extract_and_transform():
     text_cols = ['Nationality', 'District', 'Province', 'Acc_Sub_Dist', 'ICD_10']
     df[text_cols] = df[text_cols].fillna('ไม่ระบุ')
 
-    # 3. แก้ไข Data Anomaly (สลับพิกัด Lat <-> Long ให้ถูกต้องตามพิกัดไทย)
+    # 3. สลับพิกัด Lat <-> Long ให้ถูกต้องตามพิกัดไทย
     df['Latitude'] = df['Acc_long']
     df['Longitude'] = df['Acc_Lat']
     df = df.drop(columns=['Acc_Lat', 'Acc_long'])
 
-    # 4. Feature Engineering: สร้างกลุ่มอายุและมิติเวลา
+    # 4. สร้างกลุ่มอายุและมิติเวลา
     age_bins = [0, 15, 24, 60, 120]
     age_labels = ['0-15 ปี', '16-24 ปี (วัยรุ่น)', '25-59 ปี (วัยทำงาน)', '60 ปีขึ้นไป']
     df['Age_Group'] = pd.cut(df['Age'], bins=age_bins, labels=age_labels, right=False)
@@ -57,19 +57,19 @@ def extract_and_transform():
 
     # บันทึกไฟล์ผลลัพธ์
     df.to_csv(CLEAN_DATA_PATH, index=False)
-    print(f"✅ Task 1 Success: บันทึก Cleaned Data ไว้ที่ {CLEAN_DATA_PATH}")
+    print(f" Task 1 Success: บันทึก Cleaned Data ไว้ที่ {CLEAN_DATA_PATH}")
 
 # -------------------------------------------------------------
 # Task 2: Load Data to MariaDB
 # -------------------------------------------------------------
 def load_to_mariadb():
     if not os.path.exists(CLEAN_DATA_PATH):
-        raise FileNotFoundError(f"❌ ไม่พบไฟล์ Cleaned Data ที่: {CLEAN_DATA_PATH}")
+        raise FileNotFoundError(f" ไม่พบไฟล์ Cleaned Data ที่: {CLEAN_DATA_PATH}")
 
     df = pd.read_csv(CLEAN_DATA_PATH)
     df = df.replace({np.nan: None})
 
-    # เชื่อมต่อไปยัง MariaDB บน Codespaces (Localhost 127.0.0.1)
+    # เชื่อมต่อไปยัง MariaDB บน Codespaces
     conn = pymysql.connect(
         host='127.0.0.1',
         user='root',
@@ -106,7 +106,7 @@ def load_to_mariadb():
     cursor.execute("DROP TABLE IF EXISTS road_accident;")
     cursor.execute(create_sql)
 
-    # นำเข้าข้อมูลแบบ Batch Insert
+    # นำเข้าข้อมูล
     insert_sql = """
     INSERT INTO road_accident (
         id, dead_year_en, dead_date, age, sex, nationality,
@@ -130,7 +130,7 @@ def load_to_mariadb():
     cursor.executemany(insert_sql, data_to_insert)
     cursor.close()
     conn.close()
-    print(f"✅ Task 2 Success: นำเข้าข้อมูล {len(data_to_insert)} แถวลง MariaDB สำเร็จ")
+    print(f" Task 2 Success: นำเข้าข้อมูล {len(data_to_insert)} แถวลง MariaDB สำเร็จ")
 
 # -------------------------------------------------------------
 # Task 3: Query Hotspots & Trigger Agentic AI Webhook (n8n)
@@ -181,9 +181,9 @@ def trigger_agentic_ai():
     n8n_url = "http://127.0.0.1:5678/webhook/accident-alert"
     try:
         res = requests.post(n8n_url, json=payload, timeout=10)
-        print(f"✅ Task 3 Success: ส่งข้อมูลเข้า n8n Webhook สำเร็จ (Status: {res.status_code})")
+        print(f" Task 3 Success: ส่งข้อมูลเข้า n8n Webhook สำเร็จ (Status: {res.status_code})")
     except Exception as e:
-        print(f"⚠️ Task 3 Warning: ยิง Webhook ไม่สำเร็จ ({e})")
+        print(f" Task 3 Warning: ยิง Webhook ไม่สำเร็จ ({e})")
 
 # -------------------------------------------------------------
 # 2. นิยาม DAG Pipeline และ Schedule
@@ -192,7 +192,7 @@ with DAG(
     dag_id='road_accident_risk_pipeline',
     default_args=default_args,
     description='Automated ETL & Agentic AI Alert Pipeline',
-    schedule_interval='0 8 * * 1',  # รันทุกวันจันทร์ 08:00 น.
+    schedule='0 8 * * 1',  # รันทุกวันจันทร์ 08:00 น.
     catchup=False,
     tags=['road_safety', 'mariadb', 'agentic_ai']
 ) as dag:

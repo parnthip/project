@@ -1,0 +1,18 @@
+{
+  "name": "Data Engineering Environment",
+  "forwardPorts": [8080, 5678, 3306],
+  "portsAttributes": {
+    "8080": {
+      "label": "Airflow Webserver",
+      "onAutoForward": "notify"
+    },
+    "5678": {
+      "label": "n8n Workflow",
+      "onAutoForward": "notify"
+    },
+    "3306": {
+      "label": "MariaDB Database",
+      "onAutoForward": "silent"
+    }
+  }
+}

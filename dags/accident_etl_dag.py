@@ -9,11 +9,27 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 
 # -------------------------------------------------------------
-# 1. กำหนด Configuration และ Path ตามโครงสร้างบน Codespaces
+# 1. กำหนด Configuration และ Path ให้อิงตาม Container
 # -------------------------------------------------------------
-BASE_DIR = '/workspaces/project'
-RAW_DATA_PATH = os.path.join(BASE_DIR, 'dataset', 'data_2026.csv')
-CLEAN_DATA_PATH = os.path.join(BASE_DIR, 'dataset', 'cleaned_accident_data_2026.csv')
+DAGS_DIR = os.path.dirname(os.path.abspath(__file__))
+DATASET_DIR = os.path.join(DAGS_DIR, "dataset")
+os.makedirs(DATASET_DIR, exist_ok=True)
+
+RAW_DATA_PATH = os.path.join(DATASET_DIR, "data_2026.csv")
+CLEAN_DATA_PATH = os.path.join(DATASET_DIR, "cleaned_accident_data_2026.csv")
+
+# การตั้งค่า Network ภายใน Docker Compose
+DB_CONFIG = {
+    'host': os.getenv('MARIADB_HOST', 'mariadb'),
+    'user': os.getenv('MARIADB_USER', 'root'),
+    'password': os.getenv('MARIADB_PASSWORD', 'rootpassword'),
+    'database': 'accident_db',
+    'charset': 'utf8mb4',
+    'autocommit': True
+}
+
+# n8n Service ภายใน Docker Network
+N8N_WEBHOOK_URL = 'http://n8n:5678/webhook/accident-alert'
 
 default_args = {
     'owner': 'data_engineer_team',
@@ -28,7 +44,7 @@ default_args = {
 # -------------------------------------------------------------
 def extract_and_transform():
     if not os.path.exists(RAW_DATA_PATH):
-        raise FileNotFoundError(f" ไม่พบไฟล์ข้อมูลที่: {RAW_DATA_PATH}")
+        raise FileNotFoundError(f"ไม่พบไฟล์ข้อมูลที่: {RAW_DATA_PATH}")
 
     df = pd.read_csv(RAW_DATA_PATH)
 
@@ -57,30 +73,21 @@ def extract_and_transform():
 
     # บันทึกไฟล์ผลลัพธ์
     df.to_csv(CLEAN_DATA_PATH, index=False)
-    print(f" Task 1 Success: บันทึก Cleaned Data ไว้ที่ {CLEAN_DATA_PATH}")
+    print(f"Task 1 Success: บันทึก Cleaned Data ไว้ที่ {CLEAN_DATA_PATH}")
 
 # -------------------------------------------------------------
 # Task 2: Load Data to MariaDB
 # -------------------------------------------------------------
 def load_to_mariadb():
     if not os.path.exists(CLEAN_DATA_PATH):
-        raise FileNotFoundError(f" ไม่พบไฟล์ Cleaned Data ที่: {CLEAN_DATA_PATH}")
+        raise FileNotFoundError(f"ไม่พบไฟล์ Cleaned Data ที่: {CLEAN_DATA_PATH}")
 
     df = pd.read_csv(CLEAN_DATA_PATH)
     df = df.replace({np.nan: None})
 
-    # เชื่อมต่อไปยัง MariaDB บน Codespaces
-    conn = pymysql.connect(
-        host='127.0.0.1',
-        user='root',
-        password='',
-        database='accident_db',
-        charset='utf8mb4',
-        autocommit=True
-    )
+    conn = pymysql.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
-    # สร้าง Schema ตาราง road_accident
     create_sql = """
     CREATE TABLE IF NOT EXISTS road_accident (
         id INT PRIMARY KEY,
@@ -106,7 +113,6 @@ def load_to_mariadb():
     cursor.execute("DROP TABLE IF EXISTS road_accident;")
     cursor.execute(create_sql)
 
-    # นำเข้าข้อมูล
     insert_sql = """
     INSERT INTO road_accident (
         id, dead_year_en, dead_date, age, sex, nationality,
@@ -130,22 +136,15 @@ def load_to_mariadb():
     cursor.executemany(insert_sql, data_to_insert)
     cursor.close()
     conn.close()
-    print(f" Task 2 Success: นำเข้าข้อมูล {len(data_to_insert)} แถวลง MariaDB สำเร็จ")
+    print(f"Task 2 Success: นำเข้าข้อมูล {len(data_to_insert)} แถวลง MariaDB สำเร็จ")
 
 # -------------------------------------------------------------
 # Task 3: Query Hotspots & Trigger Agentic AI Webhook (n8n)
 # -------------------------------------------------------------
 def trigger_agentic_ai():
-    conn = pymysql.connect(
-        host='127.0.0.1',
-        user='root',
-        password='',
-        database='accident_db',
-        charset='utf8mb4'
-    )
+    conn = pymysql.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
-    # Query 3 จุดเสี่ยงที่มีพิกัดความถี่สูงสุด
     sql = """
     SELECT dead_prov, acc_district, latitude, longitude, vehicle, COUNT(id) AS count
     FROM road_accident
@@ -177,13 +176,11 @@ def trigger_agentic_ai():
         "top_risk_hotspots": risk_data
     }
 
-    # URL ของ Webhook ใน n8n บน Codespaces (Port 5678)
-    n8n_url = "http://127.0.0.1:5678/webhook/accident-alert"
     try:
-        res = requests.post(n8n_url, json=payload, timeout=10)
-        print(f" Task 3 Success: ส่งข้อมูลเข้า n8n Webhook สำเร็จ (Status: {res.status_code})")
+        res = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=10)
+        print(f"Task 3 Success: ส่งข้อมูลเข้า n8n Webhook สำเร็จ (Status: {res.status_code})")
     except Exception as e:
-        print(f" Task 3 Warning: ยิง Webhook ไม่สำเร็จ ({e})")
+        print(f"Task 3 Warning: ยิง Webhook ไม่สำเร็จ ({e})")
 
 # -------------------------------------------------------------
 # 2. นิยาม DAG Pipeline และ Schedule
@@ -192,7 +189,7 @@ with DAG(
     dag_id='road_accident_risk_pipeline',
     default_args=default_args,
     description='Automated ETL & Agentic AI Alert Pipeline',
-    schedule='0 8 * * 1',  # รันทุกวันจันทร์ 08:00 น.
+    schedule='0 8 * * 1',
     catchup=False,
     tags=['road_safety', 'mariadb', 'agentic_ai']
 ) as dag:
@@ -212,5 +209,4 @@ with DAG(
         python_callable=trigger_agentic_ai
     )
 
-    # กำหนดลำดับ Dependencies
     task_clean >> task_load >> task_alert

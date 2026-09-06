@@ -6,9 +6,9 @@ import platform
 os_name = platform.system()
 
 if os_name == 'Windows':
-    plt.rcParams['font.family'] = 'Tahoma'  # หรือ 'Leelawadee UI', 'Angsana New'
+    plt.rcParams['font.family'] = 'Tahoma'  
 elif os_name == 'Darwin':  # macOS
-    plt.rcParams['font.family'] = 'Thonburi'  # หรือ 'Sukhumvit Set'
+    plt.rcParams['font.family'] = 'Thonburi'  
 else:  # Linux / Ubuntu
     plt.rcParams['font.family'] = 'Garuda'
 # จัดการแกนลบและสระลอย
@@ -18,7 +18,7 @@ plt.rcParams['axes.unicode_minus'] = False
 df = pd.read_csv('dataset/data_2026.csv')
 
 # ==========================================
-# 1.1 เทคนิคที่ 1: การจัดการ Missing Values และ Drop คอลัมน์ซ้ำซ้อน/ว่างเปล่า (3 คะแนน)
+# 1.1 เทคนิคที่ 1: การจัดการ Missing Values และ Drop คอลัมน์ซ้ำซ้อน/ว่างเปล่า
 # ==========================================
 
 # 1. ลบคอลัมน์ที่เป็นค่าว่าง 100%
@@ -48,7 +48,7 @@ df[text_impute_cols] = df[text_impute_cols].fillna('ไม่ระบุ')
 
 
 # ==========================================
-# 1.2 เทคนิคที่ 2: การแก้ไขข้อมูลพิกัดสลับที่ และแปลง Data Types (3 คะแนน)
+# 1.2 เทคนิคที่ 2: การแก้ไขข้อมูลพิกัดสลับที่ และแปลง Data Types 
 # ==========================================
 
 # 1. สลับพิกัด ละติจูด-ลองจิจูด ให้ถูกต้องตามตำแหน่งประเทศไทย
@@ -70,7 +70,7 @@ for col in str_columns:
 
 
 # ==========================================
-# 1.3 เทคนิคที่ 3: Data Transformation & Visualization (4 คะแนน)
+# 1.3 เทคนิคที่ 3: Data Transformation & Visualization
 # ==========================================
 
 # 1. สร้างช่วงอายุ (Age Groups) และวัน/เดือนที่เกิดเหตุ
@@ -83,7 +83,7 @@ df['Age_Group'] = pd.cut(
 df['Accident_Month'] = df['DeadDate_EN'].dt.month
 df['Accident_Day'] = df['DeadDate_EN'].dt.day_name()
 
-# 2. Data Aggregation: สรุปพื้นที่จุดเสี่ยง 10 อันดับแรก (Top 10 High-Risk Provinces)
+# 2. Data Aggregation: สรุปพื้นที่จุดเสี่ยง 10 อันดับแรก
 top_provinces = df['Dead_Prov'].value_counts().head(10)
 
 # 3. สร้างกราฟแท่ง
